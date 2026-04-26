@@ -164,15 +164,19 @@ hlsRouter.get('/mp4', async (req: Request, res: Response) => {
       headers: upstreamHeaders,
       responseType: 'stream',
       timeout: 30_000,
+      validateStatus: () => true,  // never throw on upstream HTTP errors
     });
-    res.status(rangeHeader ? (upstream.status === 206 ? 206 : 200) : 200);
+    res.status(upstream.status);
     res.set('Access-Control-Allow-Origin', '*');
-    res.set('Content-Type', (upstream.headers['content-type'] as string) ?? 'video/mp4');
+    const ct = upstream.headers['content-type'] as string | undefined;
+    res.set('Content-Type', ct ?? 'video/mp4');
     if (upstream.headers['content-length']) res.set('Content-Length', upstream.headers['content-length'] as string);
     if (upstream.headers['content-range']) res.set('Content-Range', upstream.headers['content-range'] as string);
     res.set('Accept-Ranges', 'bytes');
     (upstream.data as NodeJS.ReadableStream).pipe(res);
-  } catch {
-    res.status(502).json({ error: 'Failed to fetch mp4' });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[proxy/mp4] upstream fetch failed:', msg);
+    if (!res.headersSent) res.status(502).json({ error: 'Failed to fetch mp4', detail: msg });
   }
 });
