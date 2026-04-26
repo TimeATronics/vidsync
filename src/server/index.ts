@@ -1,4 +1,5 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 import path from 'path';
 import express from 'express';
 import { createServer } from 'http';
@@ -7,9 +8,10 @@ import cors from 'cors';
 import session from 'express-session';
 import { registerSocketHandlers } from '../sync/socket-handler';
 import { hlsRouter } from '../proxy/hls';
-import { shutdownBrowser, getSources } from '../extractor/playwright-extractor';
+import { shutdownBrowser } from '../extractor/playwright-extractor';
 import { requireAuth, validateCredentials } from '../auth/index';
 import { searchTMDB } from '../api/search';
+import { getRiveSources } from '../api/rivestream';
 
 const app = express();
 const httpServer = createServer(app);
@@ -103,7 +105,7 @@ app.get('/api/sources', async (req, res) => {
     res.status(400).json({ error: 'type (movie|tv) and id required' }); return;
   }
   try {
-    const sources = await getSources(
+    const sources = await getRiveSources(
       type as 'movie' | 'tv',
       id,
       season ? Number(season) : undefined,
