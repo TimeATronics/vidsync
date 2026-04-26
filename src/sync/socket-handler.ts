@@ -69,6 +69,15 @@ export function registerSocketHandlers(io: Server): void {
       }      const roomId = currentRoomId;
       socket.emit('stream:loading', {});
 
+      // Direct MP4 pass-through — no extraction needed
+      if (/\.mp4(\?|$)/i.test(parsedUrl.pathname + parsedUrl.search)) {
+        const directUrl = parsedUrl.toString();
+        socket.emit('stream:ready', { url: directUrl, format: 'mp4' });
+        const p = roomManager.getPeerSocketId(roomId, socket.id);
+        if (p) io.to(p).emit('stream:assigned', { url: directUrl, format: 'mp4' });
+        return;
+      }
+
       try {
         const { manifestUrl, headers } = await extract(parsedUrl.toString());
         registerCdnHeaders(manifestUrl, headers);
@@ -82,12 +91,52 @@ export function registerSocketHandlers(io: Server): void {
         if (peerSocketId) {
           io.to(peerSocketId).emit('stream:assigned', { proxyManifestUrl });
         }
-      } catch {
+      } catch (err) {
+        console.error('[extract] failed for', parsedUrl.toString(), err);
         socket.emit('stream:error', {
           code: 'EXTRACTION_FAILED',
           message: 'Could not extract a playable stream from the provided URL',
         });
       }
+    });
+
+    // source:load — direct stream URL from sources API (skips extraction)
+    socket.on('source:load', ({ url, format }: { url: string; format: 'hls' | 'mp4' }) => {
+      if (!currentRoomId) return;
+      if (roomManager.getRole(currentRoomId, socket.id) !== 'host') return;
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url);
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') throw new Error();
+      } catch {
+        socket.emit('stream:error', { code: 'UNSUPPORTED_SOURCE', message: 'Invalid source URL' });
+        return;
+      }
+
+      const roomId = currentRoomId;
+
+      if (format === 'mp4') {
+        const payload = { url: parsedUrl.toString(), format: 'mp4' };
+        socket.emit('stream:ready', payload);
+        const p = roomManager.getPeerSocketId(roomId, socket.id);
+        if (p) io.to(p).emit('stream:assigned', payload);
+        return;
+      }
+
+      // HLS: register headers and proxy the manifest
+      const headers = {
+        Referer: 'https://rivestream.org/',
+        Origin: 'https://rivestream.org',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      };
+      registerCdnHeaders(parsedUrl.toString(), headers);
+      const PUBLIC_URL = (process.env.PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+      const proxyUrl = `${PUBLIC_URL}/proxy/manifest?url=${encodeURIComponent(parsedUrl.toString())}`;
+      const payload = { url: proxyUrl, format: 'hls' };
+      socket.emit('stream:ready', payload);
+      const p = roomManager.getPeerSocketId(roomId, socket.id);
+      if (p) io.to(p).emit('stream:assigned', payload);
     });
 
     // ── Playback commands (Host → Server → Client) ────────────────────────

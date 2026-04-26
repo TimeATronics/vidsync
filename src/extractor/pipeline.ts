@@ -14,9 +14,11 @@ export async function extract(inputUrl: string): Promise<ExtractionResult> {
   let result: ExtractionResult;
   try {
     result = await tier1(inputUrl);
-  } catch {
-    // Tier 1 failed — fall back to Playwright
+    console.log('[tier1] success:', result.manifestUrl);
+  } catch (err) {
+    console.warn('[tier1] failed, trying Playwright:', (err as Error).message);
     result = await extractWithPlaywright(inputUrl);
+    console.log('[playwright] success:', result.manifestUrl);
   }
 
   cache.set(inputUrl, result.manifestUrl, result.headers);
@@ -25,8 +27,9 @@ export async function extract(inputUrl: string): Promise<ExtractionResult> {
 
 function tier1(inputUrl: string): Promise<ExtractionResult> {
   return new Promise((resolve, reject) => {
+    const binary = process.env.YTDLP_PATH ?? '/usr/local/bin/yt-dlp';
     execFile(
-      'yt-dlp',
+      binary,
       ['--dump-json', '--no-download', inputUrl],
       { timeout: 30_000 },
       (err, stdout) => {

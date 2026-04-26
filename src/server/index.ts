@@ -7,8 +7,9 @@ import cors from 'cors';
 import session from 'express-session';
 import { registerSocketHandlers } from '../sync/socket-handler';
 import { hlsRouter } from '../proxy/hls';
-import { shutdownBrowser } from '../extractor/playwright-extractor';
+import { shutdownBrowser, getSources } from '../extractor/playwright-extractor';
 import { requireAuth, validateCredentials } from '../auth/index';
+import { searchTMDB } from '../api/search';
 
 const app = express();
 const httpServer = createServer(app);
@@ -51,7 +52,10 @@ app.post('/login', async (req, res) => {
     return res.redirect('/login?error=1');
   }
   (req.session as any).user = username;
-  res.redirect('/');
+  req.session.save((err) => {
+    if (err) { res.redirect('/login?error=1'); return; }
+    res.redirect('/');
+  });
 });
 
 app.get('/logout', (req, res) => {
@@ -77,6 +81,39 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/proxy', hlsRouter);
+
+// ── API routes ────────────────────────────────────────────────────────────────
+
+app.get('/api/search', async (req, res) => {
+  const { q, type } = req.query as Record<string, string>;
+  if (!q || !type || !['movie', 'tv'].includes(type)) {
+    res.status(400).json({ error: 'q and type (movie|tv) required' }); return;
+  }
+  try {
+    const results = await searchTMDB(q, type as 'movie' | 'tv');
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
+
+app.get('/api/sources', async (req, res) => {
+  const { type, id, season, episode } = req.query as Record<string, string>;
+  if (!type || !id || !['movie', 'tv'].includes(type)) {
+    res.status(400).json({ error: 'type (movie|tv) and id required' }); return;
+  }
+  try {
+    const sources = await getSources(
+      type as 'movie' | 'tv',
+      id,
+      season ? Number(season) : undefined,
+      episode ? Number(episode) : undefined,
+    );
+    res.json(sources);
+  } catch (err) {
+    res.status(500).json({ error: (err as Error).message });
+  }
+});
 
 registerSocketHandlers(io);
 
