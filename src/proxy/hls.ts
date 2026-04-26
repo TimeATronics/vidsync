@@ -85,7 +85,7 @@ hlsRouter.get('/segment', async (req: Request, res: Response) => {
 
   let segmentUrl: string;
   try {
-    segmentUrl = decodeURIComponent(rawUrl);
+    segmentUrl = rawUrl; // Express already decoded req.query values once
     new URL(segmentUrl);
   } catch {
     res.status(400).json({ error: 'Invalid url parameter' }); return;
@@ -140,7 +140,7 @@ hlsRouter.get('/mp4', async (req: Request, res: Response) => {
 
   let mp4Url: string;
   try {
-    mp4Url = decodeURIComponent(rawUrl);
+    mp4Url = rawUrl; // Express already decoded req.query values once
     new URL(mp4Url);
   } catch {
     res.status(400).json({ error: 'Invalid url parameter' }); return;
