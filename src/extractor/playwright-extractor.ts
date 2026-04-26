@@ -215,9 +215,29 @@ function collectStreamUrls(
   }
 }
 
+// Known video CDN host fragments — used to classify extensionless URLs
+const VIDEO_HOST_PATTERNS = [
+  /cdn\./i, /stream\./i, /video\./i, /play\./i, /media\./i,
+  /\/stream\//i, /\/video\//i, /\/play\//i, /\/hls\//i, /\/mp4\//i,
+  /\.mkv(\?|$)/i, /\.webm(\?|$)/i,
+];
+
+function isVideoUrl(url: string): boolean {
+  return (
+    HLS_URL_PATTERN.test(url) ||
+    MP4_URL_PATTERN.test(url) ||
+    VIDEO_HOST_PATTERNS.some(p => p.test(url))
+  );
+}
+
+function formatFromUrl(url: string): 'hls' | 'mp4' {
+  if (HLS_URL_PATTERN.test(url)) return 'hls';
+  return 'mp4';
+}
+
 /**
  * Navigate to the rivestream download page and collect all stream URLs found in
- * JSON API responses (both HLS .m3u8 and direct MP4).
+ * JSON API responses AND in the rendered DOM (links, data attributes, innerText).
  */
 export async function getSources(
   type: 'movie' | 'tv',
@@ -229,15 +249,27 @@ export async function getSources(
   const page = await b.newPage();
   const found = new Map<string, StreamSource>();
 
+  const addUrl = (url: string, label: string) => {
+    if (!url.startsWith('http')) return;
+    if (found.has(url)) return;
+    const fmt = formatFromUrl(url);
+    found.set(url, { label, url, format: fmt });
+  };
+
   try {
+    // ── Network interception: catch JSON API responses ──
     page.on('response', async (res: PlaywrightResponse) => {
       const ct = res.headers()['content-type'] ?? '';
-      if (!ct.includes('application/json')) return;
+      if (!ct.includes('application/json') && !ct.includes('text/plain')) return;
       try {
         const text = await res.text();
+        // Walk the raw text for any URLs before trying to parse
+        const rawMatches = text.match(/https?:\/\/[^\s"'<>]+\.(m3u8|mp4|mkv|webm)[^\s"'<>]*/gi) ?? [];
+        for (const m of rawMatches) addUrl(m, 'api');
+
         const json = JSON.parse(text);
         const sourceId: string =
-          (json?.sourceId as string) ?? (json?.data?.sourceId as string) ?? 'source';
+          (json?.sourceId as string) ?? (json?.data?.sourceId as string) ?? 'api';
         collectStreamUrls(json, found, sourceId);
       } catch { /* ignore */ }
     });
@@ -251,10 +283,41 @@ export async function getSources(
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15_000 });
 
-    // Poll up to 25 s. Short-circuit once we have ≥ 2 sources after 8 s.
-    for (let i = 0; i < 25; i++) {
+    // Poll up to 35 s. Short-circuit early once we have ≥ 2 sources after 10 s.
+    for (let i = 0; i < 35; i++) {
       await page.waitForTimeout(1000);
-      if (found.size >= 2 && i >= 7) break;
+      if (found.size >= 2 && i >= 9) break;
+    }
+
+    // ── DOM fallback: scrape <a href>, data-* attrs, and visible text ──
+    // The function passed to evaluate() runs in the browser context.
+    // We use indirect globals to avoid TypeScript's no-dom lib restriction.
+    const domData: string[] = await page.evaluate(
+      /* istanbul ignore next */
+      new Function(`
+        const urls = [];
+        const doc = window.document;
+
+        doc.querySelectorAll('a[href]').forEach(a => {
+          if (a.href && a.href.startsWith('http')) urls.push(a.href);
+        });
+
+        doc.querySelectorAll('[data-url],[data-src],[data-link],[data-href]').forEach(el => {
+          Object.values(el.dataset || {}).forEach(v => {
+            if (v && v.startsWith('http')) urls.push(v);
+          });
+        });
+
+        const bodyText = doc.body ? doc.body.innerText : '';
+        const matches = bodyText.match(/https?:\\/\\/[^\\s"'<>]+/g) || [];
+        matches.forEach(u => { if (u.startsWith('http')) urls.push(u); });
+
+        return [...new Set(urls)];
+      `) as () => string[]
+    );
+
+    for (const u of domData) {
+      if (isVideoUrl(u)) addUrl(u, 'download');
     }
 
     return Array.from(found.values());
