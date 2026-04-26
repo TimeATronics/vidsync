@@ -124,16 +124,10 @@ export function registerSocketHandlers(io: Server): void {
         return;
       }
 
-      // HLS: register headers and proxy the manifest
-      const headers = {
-        Referer: 'https://rivestream.org/',
-        Origin: 'https://rivestream.org',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      };
-      registerCdnHeaders(parsedUrl.toString(), headers);
-      const PUBLIC_URL = (process.env.PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-      const proxyUrl = `${PUBLIC_URL}/proxy/manifest?url=${encodeURIComponent(parsedUrl.toString())}`;
-      const payload = { url: proxyUrl, format: 'hls' };
+      // HLS from rivestream API: pass URL directly to browser.
+      // CDN servers block datacenter IPs but allow residential browser IPs,
+      // and hls.js fetches segments from the browser so CORS works fine.
+      const payload = { url: parsedUrl.toString(), format: 'hls' };
       socket.emit('stream:ready', payload);
       const p = roomManager.getPeerSocketId(roomId, socket.id);
       if (p) io.to(p).emit('stream:assigned', payload);

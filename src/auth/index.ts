@@ -10,7 +10,6 @@ const users = new Map<string, string>([
 export async function validateCredentials(username: string, password: string): Promise<boolean> {
   const hash = users.get(username);
   if (!hash) {
-    // Run a dummy compare to avoid timing-based username enumeration
     await bcrypt.compare(password, '$2b$10$invalidhashpaddingtomatchlength123456789012');
     return false;
   }
