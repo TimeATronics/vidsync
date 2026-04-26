@@ -104,9 +104,9 @@ crontab -e
 ```bash
 apt-get update
 apt-get install -y \
-  libglib2.0-0 libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-  libcups2 libdrm2 libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 \
-  libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2
+  libglib2.0-0t64 libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+  libcups2t64 libdrm2 libdbus-1-3 libxkbcommon0 libxcomposite1 libxdamage1 \
+  libxfixes3 libxrandr2 libgbm1 libasound2t64 libpango-1.0-0 libcairo2
 ```
 
 The Chromium binary itself is installed in Step 6 after cloning.
