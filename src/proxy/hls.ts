@@ -110,3 +110,69 @@ hlsRouter.get('/segment', async (req: Request, res: Response) => {
     res.status(502).json({ error: 'Failed to fetch segment' });
   }
 });
+
+// ── MP4 proxy ──────────────────────────────────────────────────────────────
+// Proxies MP4 streams that require a specific Referer (e.g. valhallastream CDN
+// checks for rivestream.org). Supports Range requests so seeking works.
+//
+// GET /proxy/mp4?url=<encoded>&expiry=<ts>&token=<hmac>
+
+function signMp4(url: string, expiry: number): string {
+  return crypto.createHmac('sha256', SECRET_KEY).update(`mp4:${url}:${expiry}`).digest('hex');
+}
+
+export function buildMp4ProxyUrl(mp4Url: string, publicUrl: string): string {
+  const expiry = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
+  const token = signMp4(mp4Url, expiry);
+  return `${publicUrl}/proxy/mp4?url=${encodeURIComponent(mp4Url)}&expiry=${expiry}&token=${token}`;
+}
+
+hlsRouter.get('/mp4', async (req: Request, res: Response) => {
+  const { url: rawUrl, expiry: rawExpiry, token } = req.query as Record<string, string>;
+  if (!rawUrl || !rawExpiry || !token) {
+    res.status(400).json({ error: 'Missing required parameters' }); return;
+  }
+
+  const expiry = parseInt(rawExpiry, 10);
+  if (isNaN(expiry) || Math.floor(Date.now() / 1000) > expiry) {
+    res.status(403).json({ error: 'Token expired' }); return;
+  }
+
+  let mp4Url: string;
+  try {
+    mp4Url = decodeURIComponent(rawUrl);
+    new URL(mp4Url);
+  } catch {
+    res.status(400).json({ error: 'Invalid url parameter' }); return;
+  }
+
+  const expected = signMp4(mp4Url, expiry);
+  if (token.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected))) {
+    res.status(403).json({ error: 'Invalid token' }); return;
+  }
+
+  const rangeHeader = req.headers['range'];
+  const upstreamHeaders: Record<string, string> = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Referer': 'https://rivestream.org/',
+    'Origin': 'https://rivestream.org',
+  };
+  if (rangeHeader) upstreamHeaders['Range'] = rangeHeader;
+
+  try {
+    const upstream = await axios.get(mp4Url, {
+      headers: upstreamHeaders,
+      responseType: 'stream',
+      timeout: 30_000,
+    });
+    res.status(rangeHeader ? (upstream.status === 206 ? 206 : 200) : 200);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Content-Type', (upstream.headers['content-type'] as string) ?? 'video/mp4');
+    if (upstream.headers['content-length']) res.set('Content-Length', upstream.headers['content-length'] as string);
+    if (upstream.headers['content-range']) res.set('Content-Range', upstream.headers['content-range'] as string);
+    res.set('Accept-Ranges', 'bytes');
+    (upstream.data as NodeJS.ReadableStream).pipe(res);
+  } catch {
+    res.status(502).json({ error: 'Failed to fetch mp4' });
+  }
+});

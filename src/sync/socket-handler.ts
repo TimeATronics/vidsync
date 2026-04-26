@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import * as roomManager from './room-manager';
 import { extract } from '../extractor/pipeline';
-import { registerCdnHeaders } from '../proxy/hls';
+import { registerCdnHeaders, buildMp4ProxyUrl } from '../proxy/hls';
 
 export function registerSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
@@ -117,7 +117,9 @@ export function registerSocketHandlers(io: Server): void {
       const roomId = currentRoomId;
 
       if (format === 'mp4') {
-        const payload = { url: parsedUrl.toString(), format: 'mp4' };
+        const PUBLIC_URL = (process.env.PUBLIC_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+        const proxied = buildMp4ProxyUrl(parsedUrl.toString(), PUBLIC_URL);
+        const payload = { url: proxied, format: 'mp4' };
         socket.emit('stream:ready', payload);
         const p = roomManager.getPeerSocketId(roomId, socket.id);
         if (p) io.to(p).emit('stream:assigned', payload);
