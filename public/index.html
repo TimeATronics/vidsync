@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#07060A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>VidSync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300;1,9..144,500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:          #07060A;
+      --surface:     #0F0D13;
+      --surface-2:   #181621;
+      --border:      #28242F;
+      --border-lit:  #3C3645;
+      --accent:      #C97C2E;
+      --accent-glow: rgba(201, 124, 46, 0.10);
+      --accent-dim:  rgba(201, 124, 46, 0.18);
+      --text:        #EDE8DF;
+      --text-mid:    #9A9490;
+      --text-dim:    #5A5654;
+      --danger:      #C44040;
+      --success:     #4A9968;
+      --r:           5px;
+      --f-display:   'Fraunces', Georgia, serif;
+      --f-mono:      'IBM Plex Mono', 'Courier New', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { height: 100%; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--f-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+
+    /* Grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.035;
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    .hidden { display: none !important; }
+
+    /* ─── JOIN SCREEN ─────────────────────────────────────────── */
+
+    #join-screen {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+    }
+
+    .join-inner {
+      width: 100%;
+      max-width: 340px;
+    }
+
+    /* Staggered entrance */
+    .join-inner > * { opacity: 0; animation: fadeUp 0.5s ease forwards; }
+    .join-inner > *:nth-child(1) { animation-delay: 0.05s; }
+    .join-inner > *:nth-child(2) { animation-delay: 0.15s; }
+    .join-inner > *:nth-child(3) { animation-delay: 0.25s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-area { margin-bottom: 2.75rem; }
+
+    .wordmark {
+      font-family: var(--f-display);
+      font-weight: 300;
+      font-style: italic;
+      font-size: 3.25rem;
+      color: var(--text);
+      letter-spacing: -0.025em;
+      line-height: 1;
+      margin-bottom: 0.3rem;
+    }
+
+    .wordmark em { color: var(--accent); font-style: inherit; }
+
+    .tagline {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .join-form { display: flex; flex-direction: column; gap: 0.9rem; }
+
+    .field { display: flex; flex-direction: column; gap: 0.35rem; }
+
+    .field-label {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .field input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--f-mono);
+      font-size: 0.9rem;
+      padding: 0.7rem 0.9rem;
+      border-radius: var(--r);
+      outline: none;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+
+    .field input:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--text-dim); }
+
+    .role-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem;
+      margin-top: 0.1rem;
+    }
+
+    .role-card {
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      padding: 0.8rem 0.9rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+    }
+
+    .role-card:has(input:checked) {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+
+    .role-card input[type="radio"] { display: none; }
+
+    .role-name {
+      display: block;
+      font-family: var(--f-display);
+      font-style: italic;
+      font-size: 1.05rem;
+      font-weight: 300;
+      color: var(--text);
+      margin-bottom: 0.1rem;
+    }
+
+    .role-desc {
+      display: block;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+    }
+
+    .btn-join {
+      margin-top: 0.4rem;
+      width: 100%;
+      background: var(--accent);
+      color: #07060A;
+      font-family: var(--f-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 0.85rem 1rem;
+      border: none;
+      border-radius: var(--r);
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn-join:hover  { opacity: 0.88; }
+    .btn-join:active { transform: scale(0.98); opacity: 0.75; }
+    .btn-join:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    .join-error {
+      font-size: 0.72rem;
+      color: var(--danger);
+      text-align: center;
+      min-height: 1em;
+    }
+
+    /* ─── WATCH ROOM ──────────────────────────────────────────── */
+
+    #watch-room {
+      display: flex;
+      flex-direction: column;
+      min-height: 100dvh;
+    }
+
+    /* Header */
+    .w-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      gap: 0.75rem;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0; }
+
+    .wordmark-sm {
+      font-family: var(--f-display);
+      font-style: italic;
+      font-weight: 300;
+      font-size: 1.35rem;
+      color: var(--accent);
+      letter-spacing: -0.015em;
+      flex-shrink: 0;
+    }
+
+    .room-chip {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      padding: 0.18rem 0.5rem;
+      border-radius: 3px;
+      letter-spacing: 0.04em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .role-chip {
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(201, 124, 46, 0.35);
+      padding: 0.18rem 0.4rem;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .peer-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .peer-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--border-lit);
+      flex-shrink: 0;
+      transition: background 0.4s;
+    }
+
+    .peer-dot.on { background: var(--success); box-shadow: 0 0 5px var(--success); }
+
+    /* Stream loader (host only) */
+    #stream-loader {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.6rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #stream-url {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--f-mono);
+      font-size: 0.8rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: var(--r);
+      outline: none;
+      min-width: 0;
+    }
+
+    #stream-url:focus { border-color: var(--accent); }
+    #stream-url::placeholder { color: var(--text-dim); }
+
+    .btn-load {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--f-mono);
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.55rem 0.75rem;
+      border-radius: var(--r);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .btn-load:hover:not(:disabled) { background: var(--accent); color: var(--bg); }
+    .btn-load:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    /* Status row */
+    #status-row {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      padding: 0.3rem 0.9rem;
+      min-height: 1.5rem;
+      flex-shrink: 0;
+      letter-spacing: 0.03em;
+    }
+
+    /* Player */
+    #player-wrap {
+      position: relative;
+      background: #000;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      flex-shrink: 0;
+    }
+
+    #video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+    }
+
+    /* Overlay */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      background: rgba(7, 6, 10, 0.82);
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    #overlay.off { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    .spinner {
+      width: 26px;
+      height: 26px;
+      border: 2px solid var(--border-lit);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    #overlay-msg {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+
+    /* Hold banner */
+    #hold-banner {
+      background: var(--surface-2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 0.4rem 0.9rem;
+      font-size: 0.7rem;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+      text-align: center;
+      flex-shrink: 0;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.55; }
+    }
+
+    /* Sync notification */
+    #sync-notif {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 0.3rem 0.9rem;
+      min-height: 1.6rem;
+      flex-shrink: 0;
+      transition: opacity 0.3s;
+    }
+
+    #sync-notif.fade { opacity: 0; }
+
+    /* Controls */
+    #controls {
+      padding: 0.5rem 0.9rem 1rem;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* Seek bar */
+    .seek-wrap {
+      padding: 0.5rem 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .seek-wrap.no-seek { cursor: default; pointer-events: none; }
+
+    .seek-track {
+      position: relative;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .seek-fill {
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      background: var(--accent);
+      border-radius: 2px;
+      width: 0%;
+      pointer-events: none;
+      transition: width 0.1s linear;
+    }
+
+    .seek-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 11px;
+      height: 11px;
+      background: var(--accent);
+      border-radius: 50%;
+      left: 0%;
+      pointer-events: none;
+      transition: left 0.1s linear;
+    }
+
+    .seek-wrap:active .seek-thumb { transform: translate(-50%, -50%) scale(1.4); }
+
+    /* Control row */
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .play-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid var(--border-lit);
+      background: none;
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .play-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .play-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .time-disp {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      flex: 1;
+      white-space: nowrap;
+    }
+
+    /* Volume */
+    .vol-row { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+
+    .mute-btn {
+      background: none;
+      border: none;
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: var(--text-dim);
+      padding: 0;
+      line-height: 1;
+    }
+
+    input[type="range"].vol-range {
+      -webkit-appearance: none;
+      width: 72px;
+      height: 3px;
+      background: var(--border-lit);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type="range"].vol-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 11px;
+      height: 11px;
+      background: var(--text-mid);
+      border-radius: 50%;
+    }
+
+    /* Responsive — stack controls nicely on very small screens */
+    @media (max-width: 360px) {
+      input[type="range"].vol-range { width: 55px; }
+      .time-disp { font-size: 0.65rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ JOIN SCREEN ═════════════════════════ -->
+<div id="join-screen">
+  <div class="join-inner">
+
+    <div class="logo-area">
+      <div class="wordmark">Vid<em>Sync</em></div>
+      <div class="tagline">private cinema &nbsp;·&nbsp; just two</div>
+    </div>
+
+    <form class="join-form" id="join-form">
+      <div class="field">
+        <label class="field-label" for="f-room">Room code</label>
+        <input type="text" id="f-room" placeholder="e.g. friday-films" maxlength="24"
+               autocomplete="off" spellcheck="false">
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="f-name">Your name</label>
+        <input type="text" id="f-name" placeholder="e.g. Aradhya" maxlength="30"
+               autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label class="field-label">Joining as</label>
+        <div class="role-grid">
+          <label class="role-card">
+            <input type="radio" name="role" value="host" checked>
+            <span class="role-name">Host</span>
+            <span class="role-desc">controls playback</span>
+          </label>
+          <label class="role-card">
+            <input type="radio" name="role" value="client">
+            <span class="role-name">Guest</span>
+            <span class="role-desc">watches along</span>
+          </label>
+        </div>
+      </div>
+
+      <button class="btn-join" id="join-btn" type="submit">enter the room</button>
+      <div class="join-error" id="join-error"></div>
+    </form>
+
+  </div>
+</div>
+
+
+<!-- ═══════════════════ WATCH ROOM ══════════════════════════ -->
+<div id="watch-room" class="hidden">
+
+  <header class="w-header">
+    <div class="header-left">
+      <span class="wordmark-sm">VS</span>
+      <span class="room-chip" id="room-chip">——</span>
+      <span class="role-chip" id="role-chip">host</span>
+    </div>
+    <div class="peer-pill">
+      <div class="peer-dot" id="peer-dot"></div>
+      <span id="peer-label">waiting...</span>
+    </div>
+  </header>
+
+  <div id="stream-loader" class="hidden">
+    <input type="text" id="stream-url" placeholder="paste stream url..." autocomplete="off" spellcheck="false">
+    <button class="btn-load" id="load-btn">Load</button>
+  </div>
+
+  <div id="status-row"></div>
+
+  <div id="player-wrap">
+    <video id="video" playsinline></video>
+    <div id="overlay">
+      <div class="spinner hidden" id="ov-spinner"></div>
+      <div id="overlay-msg">waiting for stream</div>
+    </div>
+  </div>
+
+  <div id="hold-banner" class="hidden">
+    ⏸&nbsp;<span id="hold-reason">buffering…</span>
+  </div>
+
+  <div id="sync-notif"></div>
+
+  <div id="controls">
+    <div class="seek-wrap" id="seek-wrap">
+      <div class="seek-track">
+        <div class="seek-fill" id="seek-fill"></div>
+        <div class="seek-thumb" id="seek-thumb"></div>
+      </div>
+    </div>
+    <div class="ctrl-row">
+      <button class="play-btn" id="play-btn" disabled>▶</button>
+      <span class="time-disp" id="time-disp">0:00 / 0:00</span>
+      <div class="vol-row">
+        <button class="mute-btn" id="mute-btn" title="mute">🔊</button>
+        <input type="range" class="vol-range" id="vol-range" min="0" max="100" value="100">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- HLS.js + Socket.io -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+'use strict';
+
+// ── DOM ──────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+const joinScreen  = $('join-screen');
+const watchRoom   = $('watch-room');
+const joinForm    = $('join-form');
+const joinBtn     = $('join-btn');
+const joinError   = $('join-error');
+
+const roomChip    = $('room-chip');
+const roleChip    = $('role-chip');
+const peerDot     = $('peer-dot');
+const peerLabel   = $('peer-label');
+
+const streamLoader = $('stream-loader');
+const streamUrlIn  = $('stream-url');
+const loadBtn      = $('load-btn');
+const statusRow    = $('status-row');
+
+const playerWrap   = $('player-wrap');
+const video        = $('video');
+const overlay      = $('overlay');
+const ovSpinner    = $('ov-spinner');
+const overlayMsg   = $('overlay-msg');
+
+const holdBanner   = $('hold-banner');
+const holdReason   = $('hold-reason');
+const syncNotif    = $('sync-notif');
+
+const seekWrap     = $('seek-wrap');
+const seekFill     = $('seek-fill');
+const seekThumb    = $('seek-thumb');
+const playBtn      = $('play-btn');
+const timeDisp     = $('time-disp');
+const muteBtn      = $('mute-btn');
+const volRange     = $('vol-range');
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  role:        null,
+  roomId:      null,
+  streamReady: false,
+  playing:     false,
+  held:        false,
+  pendingPlay: null,   // { position } — mobile autoplay gate
+  hbTimer:     null,   // heartbeat interval (host)
+  prTimer:     null,   // position-report interval (client)
+};
+
+// ── SOCKET ───────────────────────────────────────────────────────────────────
+const socket = io();
+
+// ── JOIN ─────────────────────────────────────────────────────────────────────
+joinForm.addEventListener('submit', e => {
+  e.preventDefault();
+  const roomId      = $('f-room').value.trim();
+  const displayName = $('f-name').value.trim();
+  const role        = document.querySelector('input[name="role"]:checked').value;
+
+  if (!roomId || !displayName) {
+    joinError.textContent = 'please fill in both fields'; return;
+  }
+
+  joinError.textContent = '';
+  joinBtn.disabled = true;
+  joinBtn.textContent = 'connecting…';
+  S.role   = role;
+  S.roomId = roomId;
+
+  socket.emit('room:join', { roomId, role, displayName });
+});
+
+// ── SOCKET EVENTS ────────────────────────────────────────────────────────────
+
+socket.on('room:joined', ({ role, peerConnected }) => {
+  joinScreen.classList.add('hidden');
+  watchRoom.classList.remove('hidden');
+  joinBtn.disabled = false;
+  joinBtn.textContent = 'enter the room';
+
+  roomChip.textContent = S.roomId;
+  roleChip.textContent = role;
+
+  if (role === 'host') {
+    streamLoader.classList.remove('hidden');
+  } else {
+    seekWrap.classList.add('no-seek');
+  }
+
+  if (peerConnected) {
+    peerDot.classList.add('on');
+    peerLabel.textContent = 'connected';
+  }
+
+  startTimers();
+});
+
+socket.on('room:peer_joined', ({ displayName }) => {
+  peerDot.classList.add('on');
+  peerLabel.textContent = displayName;
+  flashNotif('↗ ' + displayName + ' joined');
+});
+
+socket.on('room:peer_left', () => {
+  peerDot.classList.remove('on');
+  peerLabel.textContent = 'disconnected';
+  flashNotif('↙ guest left');
+});
+
+socket.on('room:error', ({ code, message }) => {
+  joinBtn.disabled = false;
+  joinBtn.textContent = 'enter the room';
+  joinError.textContent = message || code;
+});
+
+// Stream
+socket.on('stream:loading', () => {
+  loadBtn.disabled = true;
+  setStatus('extracting stream…');
+  showOverlay(true, true, 'extracting stream…');
+});
+
+socket.on('stream:ready', ({ proxyManifestUrl }) => {
+  loadBtn.disabled = false;
+  setStatus('stream ready');
+  initHLS(proxyManifestUrl);
+});
+
+socket.on('stream:assigned', ({ proxyManifestUrl }) => {
+  showOverlay(true, true, 'loading stream…');
+  initHLS(proxyManifestUrl);
+});
+
+socket.on('stream:error', ({ message }) => {
+  loadBtn.disabled = false;
+  setStatus('✕ ' + message);
+  showOverlay(true, false, 'extraction failed');
+});
+
+// Playback commands → received by client only
+socket.on('player:play', ({ position }) => {
+  if (S.role !== 'client') return;
+  S.playing = true;
+  updatePlayBtn(true);
+  video.currentTime = position;
+  const p = video.play();
+  if (p) p.catch(() => { S.pendingPlay = { position }; flashNotif('tap to start'); });
+});
+
+socket.on('player:pause', ({ position }) => {
+  if (S.role !== 'client') return;
+  S.playing = false;
+  updatePlayBtn(false);
+  video.currentTime = position;
+  video.pause();
+});
+
+socket.on('player:seek', ({ position }) => {
+  if (S.role !== 'client') return;
+  video.currentTime = position;
+  if (S.playing && !S.held) video.play().catch(() => {});
+});
+
+// Drift
+socket.on('player:correction', ({ position, playing }) => {
+  video.currentTime = position;
+  if (playing && !S.held) video.play().catch(() => {});
+  flashNotif('↻ resynced');
+});
+
+socket.on('player:catchup', ({ targetPosition, rate }) => {
+  video.playbackRate = rate;
+  const iv = setInterval(() => {
+    if (video.currentTime >= targetPosition) {
+      video.playbackRate = 1.0;
+      clearInterval(iv);
+    }
+  }, 500);
+  flashNotif('↑ catching up');
+});
+
+// Buffer hold / resume
+socket.on('player:hold', ({ reason }) => {
+  S.held = true;
+  video.pause();
+  holdBanner.classList.remove('hidden');
+  holdReason.textContent = reason === 'host_buffering' ? 'host is buffering…' : 'guest is buffering…';
+});
+
+socket.on('player:resume', ({ position }) => {
+  S.held = false;
+  holdBanner.classList.add('hidden');
+  video.currentTime = position;
+  if (S.playing) video.play().catch(() => { S.pendingPlay = { position }; });
+});
+
+// ── VIDEO EVENTS ─────────────────────────────────────────────────────────────
+
+video.addEventListener('waiting', () => {
+  if (!S.streamReady) return;
+  socket.emit('player:buffer_start', { position: video.currentTime, role: S.role });
+});
+
+video.addEventListener('canplay', () => {
+  if (!S.streamReady) return;
+  socket.emit('player:buffer_end', { position: video.currentTime, role: S.role });
+});
+
+video.addEventListener('timeupdate', updateSeek);
+video.addEventListener('play',  () => updatePlayBtn(true));
+video.addEventListener('pause', () => updatePlayBtn(false));
+
+// ── PLAY / PAUSE BUTTON ──────────────────────────────────────────────────────
+
+playBtn.addEventListener('click', () => {
+  // Mobile autoplay gate: execute buffered command
+  if (S.pendingPlay) {
+    const { position } = S.pendingPlay;
+    S.pendingPlay = null;
+    video.currentTime = position;
+    video.play().catch(() => {});
+    return;
+  }
+
+  if (S.role !== 'host' || !S.streamReady) return;
+
+  if (video.paused) {
+    video.play().catch(() => {});
+    socket.emit('player:play', { position: video.currentTime });
+    S.playing = true;
+  } else {
+    video.pause();
+    socket.emit('player:pause', { position: video.currentTime });
+    S.playing = false;
+  }
+});
+
+// Tap anywhere to release pending play on mobile
+document.addEventListener('click', () => {
+  if (S.pendingPlay) {
+    const { position } = S.pendingPlay;
+    S.pendingPlay = null;
+    video.currentTime = position;
+    video.play().catch(() => {});
+  }
+});
+
+// ── SEEK BAR ─────────────────────────────────────────────────────────────────
+
+function doSeek(clientX) {
+  if (S.role !== 'host' || !S.streamReady) return;
+  const rect  = seekWrap.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const pos   = ratio * (video.duration || 0);
+  video.currentTime = pos;
+  socket.emit('player:seek', { position: pos });
+}
+
+seekWrap.addEventListener('click', e => doSeek(e.clientX));
+seekWrap.addEventListener('touchstart', e => doSeek(e.touches[0].clientX), { passive: true });
+
+// ── VOLUME ───────────────────────────────────────────────────────────────────
+
+volRange.addEventListener('input', () => {
+  video.volume = volRange.value / 100;
+  muteBtn.textContent = volRange.value == 0 ? '🔇' : '🔊';
+});
+
+muteBtn.addEventListener('click', () => {
+  video.muted = !video.muted;
+  muteBtn.textContent = video.muted ? '🔇' : '🔊';
+});
+
+// ── STREAM LOAD BUTTON ───────────────────────────────────────────────────────
+
+loadBtn.addEventListener('click', () => {
+  const url = streamUrlIn.value.trim();
+  if (url) socket.emit('stream:load', { url });
+});
+
+streamUrlIn.addEventListener('keydown', e => { if (e.key === 'Enter') loadBtn.click(); });
+
+// ── HLS INIT ─────────────────────────────────────────────────────────────────
+
+let hlsInstance = null;
+
+function initHLS(url) {
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+
+  if (Hls.isSupported()) {
+    hlsInstance = new Hls({ enableWorker: true });
+    hlsInstance.loadSource(url);
+    hlsInstance.attachMedia(video);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+      S.streamReady = true;
+      showOverlay(false);
+      playBtn.disabled = false;
+    });
+    hlsInstance.on(Hls.Events.ERROR, (_, d) => {
+      if (d.fatal) showOverlay(true, false, 'stream error');
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Native HLS (Safari / iOS)
+    video.src = url;
+    video.addEventListener('loadedmetadata', () => {
+      S.streamReady = true;
+      showOverlay(false);
+      playBtn.disabled = false;
+    }, { once: true });
+  } else {
+    showOverlay(true, false, 'HLS not supported');
+  }
+}
+
+// ── TIMERS (heartbeat / position report) ─────────────────────────────────────
+
+function startTimers() {
+  clearInterval(S.hbTimer);
+  clearInterval(S.prTimer);
+
+  if (S.role === 'host') {
+    S.hbTimer = setInterval(() => {
+      if (S.streamReady && !video.paused) {
+        socket.emit('player:heartbeat', {
+          position:  video.currentTime,
+          playing:   !video.paused,
+          timestamp: Date.now(),
+        });
+      }
+    }, 5000);
+  } else {
+    S.prTimer = setInterval(() => {
+      if (S.streamReady && !video.paused) {
+        socket.emit('player:position_report', { position: video.currentTime });
+      }
+    }, 5000);
+  }
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────────────────────
+
+function showOverlay(active, spinning, msg) {
+  if (active) {
+    overlayMsg.textContent = msg || '';
+    ovSpinner.classList.toggle('hidden', !spinning);
+    overlay.classList.remove('off');
+  } else {
+    overlay.classList.add('off');
+    ovSpinner.classList.add('hidden');
+  }
+}
+
+function updatePlayBtn(playing) {
+  S.playing = playing;
+  playBtn.textContent = playing ? '⏸' : '▶';
+}
+
+function updateSeek() {
+  if (!video.duration) return;
+  const pct = (video.currentTime / video.duration) * 100;
+  seekFill.style.width  = pct + '%';
+  seekThumb.style.left  = pct + '%';
+  timeDisp.textContent  = fmt(video.currentTime) + ' / ' + fmt(video.duration);
+}
+
+function fmt(s) {
+  if (!isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const ss = Math.floor(s % 60);
+  return m + ':' + String(ss).padStart(2, '0');
+}
+
+function setStatus(msg) { statusRow.textContent = msg; }
+
+let notifTimer;
+function flashNotif(msg) {
+  syncNotif.textContent = msg;
+  syncNotif.classList.remove('fade');
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => { syncNotif.classList.add('fade'); }, 2800);
+}
+</script>
+</body>
+</html>
